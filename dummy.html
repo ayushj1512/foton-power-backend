@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Order Confirmation Email Preview</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap"
+    rel="stylesheet"
+  >
+
+  <style>
+    :root {
+      --bg: #ffffff;
+      --white: #ffffff;
+      --black: #000000;
+      --muted: #525252;
+      --line: #eceff3;
+      --soft: #f8fafc;
+      --soft-green: #f0fdf4;
+      --navy: #0f172a;
+      --green: #15803d;
+      --radius: 20px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      padding: 32px 16px;
+      background: var(--bg);
+      color: var(--black);
+      font-family: "Poppins", Arial, Helvetica, sans-serif;
+    }
+
+    .page {
+      max-width: 1120px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: 320px minmax(0, 1fr);
+      gap: 24px;
+      align-items: start;
+    }
+
+    .panel,
+    .preview-wrap {
+      background: var(--white);
+      border: 1px solid #f3f4f6;
+      border-radius: 28px;
+      box-shadow: 0 18px 45px rgba(15, 23, 42, 0.06);
+    }
+
+    .panel {
+      padding: 22px;
+      position: sticky;
+      top: 20px;
+    }
+
+    .eyebrow {
+      margin: 0;
+      font-size: 11px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--muted);
+      font-weight: 600;
+    }
+
+    .panel h1 {
+      margin: 10px 0 8px;
+      font-size: 24px;
+      line-height: 1.25;
+      font-weight: 700;
+      color: var(--black);
+    }
+
+    .panel p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.8;
+      font-weight: 400;
+    }
+
+    .meta-list {
+      margin: 18px 0 0;
+      padding: 0;
+      list-style: none;
+      display: grid;
+      gap: 12px;
+    }
+
+    .meta-list li {
+      padding: 14px 15px;
+      background: #ffffff;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      font-size: 13px;
+      line-height: 1.7;
+      color: var(--muted);
+    }
+
+    .meta-list strong {
+      display: block;
+      color: var(--black);
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 4px;
+      font-weight: 600;
+    }
+
+    .preview-wrap {
+      padding: 26px;
+      background: #ffffff;
+    }
+
+    .preview-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 18px;
+      padding-bottom: 14px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .preview-title h2 {
+      margin: 0;
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--black);
+    }
+
+    .badge {
+      padding: 7px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 600;
+      background: var(--soft-green);
+      color: var(--green);
+      border: 1px solid rgba(21, 128, 61, 0.15);
+    }
+
+    .email-shell {
+      background: #ffffff;
+      padding: 0;
+      border-radius: 24px;
+      overflow: auto;
+    }
+
+    .email-card {
+      width: 100%;
+      max-width: 700px;
+      margin: 0 auto;
+      background: var(--white);
+      border-radius: 24px;
+      overflow: hidden;
+      box-shadow: 0 18px 50px rgba(15, 23, 42, 0.10);
+      border: 1px solid #f3f4f6;
+    }
+
+    .top-accent {
+      height: 5px;
+      background: linear-gradient(90deg, var(--navy) 0%, var(--green) 100%);
+    }
+
+    .email-inner {
+      padding: 0 34px 36px;
+    }
+
+    .header-block {
+      text-align: center;
+      padding: 28px 0 10px;
+    }
+
+    .logo-row {
+      text-align: center;
+    }
+
+    .logo-row img {
+      height: 128px;
+      width: auto;
+      object-fit: contain;
+      display: inline-block;
+    }
+
+    .brand-name {
+      margin: 8px 0 0;
+      font-size: 12px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--muted);
+      font-weight: 600;
+    }
+
+    .hero-title {
+      margin: 12px 0 0;
+      font-size: 32px;
+      line-height: 1.2;
+      color: var(--black);
+      font-weight: 700;
+    }
+
+    .hero-copy {
+      max-width: 520px;
+      margin: 14px auto 0;
+      font-size: 15px;
+      line-height: 1.9;
+      color: #404040;
+      font-weight: 400;
+    }
+
+    .summary-box {
+      margin-top: 24px;
+      background: #ffffff;
+      border-radius: var(--radius);
+      padding: 20px 22px;
+      border: 1px solid #f1f5f9;
+    }
+
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 18px;
+    }
+
+    .label {
+      margin: 0;
+      font-size: 11px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      font-weight: 600;
+    }
+
+    .value {
+      margin: 7px 0 0;
+      font-size: 15px;
+      color: var(--black);
+      font-weight: 600;
+      line-height: 1.6;
+    }
+
+    .value.navy {
+      color: var(--navy);
+      font-size: 18px;
+      font-weight: 700;
+    }
+
+    .section-title {
+      margin: 30px 0 0;
+      font-size: 20px;
+      line-height: 1.4;
+      font-weight: 700;
+      color: var(--black);
+    }
+
+    .section-copy {
+      margin: 6px 0 0;
+      font-size: 13px;
+      color: var(--muted);
+      line-height: 1.8;
+    }
+
+    .items {
+      margin-top: 12px;
+      border-top: 1px solid var(--line);
+    }
+
+    .item {
+      display: grid;
+      grid-template-columns: 82px minmax(0, 1fr) auto;
+      gap: 16px;
+      padding: 18px 0;
+      border-bottom: 1px solid var(--line);
+      align-items: start;
+    }
+
+    .item img {
+      width: 82px;
+      height: 102px;
+      border-radius: 14px;
+      object-fit: cover;
+      background: var(--soft);
+      display: block;
+    }
+
+    .item-name {
+      margin: 0;
+      font-size: 14px;
+      font-weight: 600;
+      line-height: 1.7;
+      color: var(--black);
+    }
+
+    .item-meta,
+    .item-qty {
+      margin: 6px 0 0;
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.7;
+      font-weight: 400;
+    }
+
+    .item-price {
+      margin: 0;
+      font-size: 14px;
+      font-weight: 600;
+      white-space: nowrap;
+      color: var(--black);
+    }
+
+    .two-col {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px;
+      margin-top: 30px;
+    }
+
+    .card {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 20px;
+      background: var(--white);
+    }
+
+    .card h3 {
+      margin: 0;
+      font-size: 14px;
+      line-height: 1.5;
+      font-weight: 600;
+      color: var(--black);
+    }
+
+    .card p {
+      margin: 10px 0 0;
+      font-size: 13px;
+      line-height: 1.9;
+      color: #404040;
+      font-weight: 400;
+    }
+
+    .help-box {
+      margin-top: 30px;
+      background: var(--soft-green);
+      border-radius: var(--radius);
+      padding: 18px 20px;
+      border: 1px solid rgba(21, 128, 61, 0.12);
+    }
+
+    .help-box p {
+      margin: 0;
+      font-size: 14px;
+      line-height: 1.8;
+      color: var(--black);
+    }
+
+    .help-box strong {
+      color: var(--green);
+      font-weight: 600;
+    }
+
+    .footer-copy {
+      margin: 30px 0 0;
+      font-size: 14px;
+      line-height: 1.9;
+      color: #404040;
+    }
+
+    .footer-copy span {
+      font-weight: 600;
+      color: var(--black);
+    }
+
+    @media (max-width: 920px) {
+      .page {
+        grid-template-columns: 1fr;
+      }
+
+      .panel {
+        position: static;
+      }
+    }
+
+    @media (max-width: 640px) {
+      body {
+        padding: 16px;
+      }
+
+      .preview-wrap {
+        padding: 16px;
+      }
+
+      .email-inner {
+        padding: 0 18px 24px;
+      }
+
+      .summary-grid,
+      .two-col,
+      .item {
+        grid-template-columns: 1fr;
+      }
+
+      .item img {
+        width: 76px;
+        height: 94px;
+      }
+
+      .hero-title {
+        font-size: 27px;
+      }
+
+      .logo-row img {
+        height: 108px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <aside class="panel">
+      <p class="eyebrow">Mailer Preview</p>
+      <h1>Order Confirmation</h1>
+      <p>
+        Ye premium preview file dummy order details ke saath bani hai taaki tum layout,
+        header, spacing aur content tone ko easily refine kar sako before backend integration.
+      </p>
+
+      <ul class="meta-list">
+        <li>
+          <strong>Brand Style</strong>
+          White background, black typography, premium minimal UI with navy and green accents.
+        </li>
+        <li>
+          <strong>Logo Used</strong>
+          Updated Foton logo with bigger visual presence in the main header.
+        </li>
+        <li>
+          <strong>Dummy Customer</strong>
+          Aarushi Sharma · COD order · 2 items · New Delhi address.
+        </li>
+        <li>
+          <strong>Use Case</strong>
+          Final HTML preview before converting this into reusable backend mailer template.
+        </li>
+      </ul>
+    </aside>
+
+    <section class="preview-wrap">
+      <div class="preview-title">
+        <h2>Live Email Preview</h2>
+        <span class="badge">Dummy Data</span>
+      </div>
+
+      <div class="email-shell">
+        <div class="email-card">
+          <div class="top-accent"></div>
+
+          <div class="email-inner">
+            <div class="header-block">
+              <div class="logo-row">
+                <img
+                  src="https://res.cloudinary.com/dcayfmx5m/image/upload/v1775326304/6bef31b1-8bce-4986-8d41-ba70a6726c55_hlokvv.webp"
+                  alt="Foton Logo"
+                />
+              </div>
+
+              <p class="brand-name">Foton</p>
+
+              <h1 class="hero-title">Your Order is Confirmed</h1>
+
+              <p class="hero-copy">
+                Hi <strong style="color:#000000;">Aarushi Sharma</strong>, thank you for placing your order with us.
+                We truly appreciate your trust and are delighted to have you with Foton.
+                Your order has been received successfully, and we’ll keep you updated at every step as it is prepared and shipped.
+              </p>
+            </div>
+
+            <div class="summary-box">
+              <div class="summary-grid">
+                <div>
+                  <p class="label">Order Number</p>
+                  <p class="value">MIRAY-000123</p>
+                </div>
+
+                <div style="text-align:right;">
+                  <p class="label">Order Date</p>
+                  <p class="value">04 Apr 2026</p>
+                </div>
+
+                <div>
+                  <p class="label">Payment</p>
+                  <p class="value">Cash on Delivery</p>
+                </div>
+
+                <div style="text-align:right;">
+                  <p class="label">Total</p>
+                  <p class="value navy">₹2,499.00</p>
+                </div>
+              </div>
+            </div>
+
+            <h2 class="section-title">Order Summary</h2>
+            <p class="section-copy">2 items in this order</p>
+
+            <div class="items">
+              <div class="item">
+                <img
+                  src="https://images.unsplash.com/photo-1496747611176-843222e1e57c?auto=format&fit=crop&w=300&q=80"
+                  alt="Black Floral Dress"
+                />
+                <div>
+                  <p class="item-name">Black Floral Dress</p>
+                  <p class="item-meta">Size: M · Color: Black</p>
+                  <p class="item-qty">Qty: 1</p>
+                </div>
+                <p class="item-price">₹1,299.00</p>
+              </div>
+
+              <div class="item">
+                <img
+                  src="https://images.unsplash.com/photo-1529139574466-a303027c1d8b?auto=format&fit=crop&w=300&q=80"
+                  alt="Beige Satin Top"
+                />
+                <div>
+                  <p class="item-name">Beige Satin Top</p>
+                  <p class="item-meta">Size: S · Color: Beige</p>
+                  <p class="item-qty">Qty: 1</p>
+                </div>
+                <p class="item-price">₹1,200.00</p>
+              </div>
+            </div>
+
+            <div class="two-col">
+              <div class="card">
+                <h3>Shipping Address</h3>
+                <p>
+                  Aarushi Sharma<br />
+                  9876543210<br />
+                  C-42, Green Park, Near Main Market<br />
+                  New Delhi, Delhi, 110016
+                </p>
+              </div>
+
+              <div class="card">
+                <h3>What happens next?</h3>
+                <p>
+                  Our team is now preparing your order with care. Once it is packed and dispatched,
+                  you will receive another email with shipment and tracking details.
+                </p>
+              </div>
+            </div>
+
+            <div class="help-box">
+              <p>
+                <strong>Need help?</strong> Simply reply to this email and our team will be happy to assist you.
+              </p>
+            </div>
+
+            <p class="footer-copy">
+              With gratitude,<br />
+              <span>Team Foton</span>
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+</body>
+</html>
