@@ -8,7 +8,7 @@ import mongoose from "mongoose";
 import cloudinaryRoutes from "./cloudinary/cloudinary.routes.js";
 import adminUsersRoute from "./adminUsers/adminUsersRoute.js";
 import supportTicketRoutes from "./customerSupportTicket/customerSupportTicket.routes.js";
-import categoryRoutes from "./category/CategoryRoutes.js";
+import categoryRoutes from "./Category/CategoryRoutes.js";
 import productRoutes from "./product/product.routes.js";
 import blogRoutes from "./blog/blog.routes.js";
 import wishlistRoutes from "./wishlist/wishlist.routes.js";
