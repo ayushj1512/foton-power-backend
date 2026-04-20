@@ -1,6 +1,6 @@
 import mongoose from "mongoose";
 import Counter from "../models/Counter.js";
-import Category from "../category/category.js";
+import Category from "../Category/Category.js";
 
 const { Schema } = mongoose;
 
