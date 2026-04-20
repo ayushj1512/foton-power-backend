@@ -1,6 +1,6 @@
 import mongoose from "mongoose";
 import Product from "./product.js";
-import Category from "../category/category.js";
+import Category from "../Category/Category.js";
 import Collection from "../collection/collection.js";
 
 const isValidObjectId = (value) => mongoose.Types.ObjectId.isValid(value);
