@@ -176,6 +176,7 @@ const buildProductFilters = async (query = {}, { admin = false } = {}) => {
     collection,
     featured,
     bestSeller,
+    trending,
     minPrice,
     maxPrice,
     inStock,
@@ -249,6 +250,11 @@ const buildProductFilters = async (query = {}, { admin = false } = {}) => {
   const bestSellerBool = parseBool(bestSeller);
   if (typeof bestSellerBool === "boolean") {
     filter.isBestSeller = bestSellerBool;
+  }
+
+  const trendingBool = parseBool(trending);
+  if (typeof trendingBool === "boolean") {
+    filter.isTrending = trendingBool;
   }
 
   const min = parseNumber(minPrice);

@@ -1,5 +1,12 @@
 import mongoose from "mongoose";
 import Order from "./orders.js";
+import {
+  cleanString,
+  normalizeEmail,
+  normalizePhone,
+  findOrCreateCustomerByPhone,
+  normalizeOrderCustomerSnapshot,
+} from "../customer/customer.utils.js";
 
 const { Types } = mongoose;
 
@@ -7,8 +14,6 @@ const { Types } = mongoose;
    HELPERS
 ========================================================= */
 const isValidObjectId = (id) => Types.ObjectId.isValid(id);
-
-const cleanString = (value = "") => String(value || "").trim();
 
 const cleanNumber = (value, fallback = 0) => {
   const num = Number(value);
@@ -28,6 +33,7 @@ const applyStatusDates = (order, nextStatus) => {
 
   if (nextStatus === "delivered" && !order.deliveredAt) {
     order.deliveredAt = new Date();
+
     if (!order.shipment?.deliveredAt) {
       order.shipment = {
         ...(order.shipment?.toObject ? order.shipment.toObject() : order.shipment || {}),
@@ -111,6 +117,7 @@ const buildOrderFilters = (query = {}) => {
       { "customer.fullName": { $regex: search, $options: "i" } },
       { "customer.firstName": { $regex: search, $options: "i" } },
       { "customer.lastName": { $regex: search, $options: "i" } },
+      { "customer.name": { $regex: search, $options: "i" } },
       { "customer.email": { $regex: search, $options: "i" } },
       { "customer.customerCode": { $regex: search, $options: "i" } },
       { "shipment.awbNumber": { $regex: search, $options: "i" } },
@@ -132,9 +139,25 @@ const buildOrderFilters = (query = {}) => {
 export const createOrder = async (req, res) => {
   try {
     const body = req.body || {};
+    const firebaseUid = cleanString(body.firebaseUid);
+    const orderDate = new Date();
+
+    const syncedCustomer = await findOrCreateCustomerByPhone({
+      customer: body.customer || {},
+      shippingAddress: body.shippingAddress || {},
+      billingAddress: body.billingAddress || {},
+      gstDetails: body.gstDetails || {},
+      firebaseUid,
+      orderDate,
+    });
 
     const order = new Order({
       ...body,
+      customer: normalizeOrderCustomerSnapshot({
+        customer: body.customer || {},
+        syncedCustomer,
+        firebaseUid,
+      }),
       createdBy: req.user?._id || null,
       updatedBy: req.user?._id || null,
     });
@@ -145,6 +168,7 @@ export const createOrder = async (req, res) => {
       success: true,
       message: "Order created successfully",
       order: savedOrder,
+      customer: syncedCustomer || null,
     });
   } catch (error) {
     console.error("createOrder error:", error);
@@ -501,7 +525,11 @@ export const updateShipmentDetails = async (req, res) => {
       cleanString(order.shipment.trackingNumber) ||
       cleanString(order.shipment.courierName)
     ) {
-      if (order.orderStatus === "processing" || order.orderStatus === "packed" || order.orderStatus === "picked") {
+      if (
+        order.orderStatus === "processing" ||
+        order.orderStatus === "packed" ||
+        order.orderStatus === "picked"
+      ) {
         order.orderStatus = "shipped";
       }
 

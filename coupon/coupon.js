@@ -1,5 +1,5 @@
 import mongoose from "mongoose";
-import Counter from "./Counter.js";
+import Counter from "../models/Counter.js";
 
 const { Schema } = mongoose;
 
@@ -69,7 +69,6 @@ const couponSchema = new Schema(
       index: true,
     },
 
-    /* -------------------- Discount -------------------- */
     discountType: {
       type: String,
       enum: DISCOUNT_TYPES,
@@ -89,25 +88,21 @@ const couponSchema = new Schema(
       min: 0,
     },
 
-    /* -------------------- Rules -------------------- */
     minimumOrderValue: { type: Number, default: 0 },
     maximumOrderValue: { type: Number, default: 0 },
     minimumTotalQty: { type: Number, default: 0 },
 
-    /* -------------------- Usage -------------------- */
     totalUsageLimit: { type: Number, default: 0 },
     perCustomerLimit: { type: Number, default: 1 },
     usedCount: { type: Number, default: 0 },
 
-    /* -------------------- Validity -------------------- */
     startsAt: { type: Date, default: null, index: true },
     endsAt: { type: Date, default: null, index: true },
 
-    validDays: [{ type: Number, min: 0, max: 6 }], // 0-6 (Sun-Sat)
+    validDays: [{ type: Number, min: 0, max: 6 }],
     startTime: { type: String, default: "" },
     endTime: { type: String, default: "" },
 
-    /* -------------------- Targeting -------------------- */
     productCodes: [{ type: String, trim: true, uppercase: true }],
     excludedProductCodes: [{ type: String, trim: true, uppercase: true }],
 
@@ -116,7 +111,6 @@ const couponSchema = new Schema(
 
     tags: [{ type: String, trim: true, lowercase: true }],
 
-    /* -------------------- Customer Rules -------------------- */
     firstOrderOnly: { type: Boolean, default: false },
 
     allowedCustomerCodes: [{ type: String, trim: true, uppercase: true }],
@@ -125,18 +119,15 @@ const couponSchema = new Schema(
     allowedEmails: [{ type: String, trim: true, lowercase: true }],
     blockedEmails: [{ type: String, trim: true, lowercase: true }],
 
-    /* -------------------- Payment -------------------- */
     allowedPaymentMethods: [{ type: String, enum: PAYMENT_METHODS }],
     excludedPaymentMethods: [{ type: String, enum: PAYMENT_METHODS }],
 
-    /* -------------------- Behavior -------------------- */
     canCombineWithOtherCoupons: { type: Boolean, default: false },
     canCombineWithSale: { type: Boolean, default: true },
     appliesOnShipping: { type: Boolean, default: false },
 
     priority: { type: Number, default: 0, index: true },
 
-    /* -------------------- Analytics -------------------- */
     totalDiscountGiven: { type: Number, default: 0 },
     lastUsedAt: { type: Date, default: null, index: true },
 
@@ -152,55 +143,48 @@ const couponSchema = new Schema(
    Static
 ------------------------------------------------------- */
 couponSchema.statics.generateCouponCode = async function () {
-  return Counter.getNextWithPrefix("couponCode", {
+  return Counter.getNextPadded("couponCode", {
     prefix: "CPN-",
     pad: 5,
+    start: 1,
   });
 };
 
 /* -------------------------------------------------------
    Hooks
 ------------------------------------------------------- */
-couponSchema.pre("validate", async function (next) {
-  try {
-    if (!this.couponCode) {
-      this.couponCode = await this.constructor.generateCouponCode();
-    }
+couponSchema.pre("validate", async function () {
+  if (!this.couponCode) {
+    this.couponCode = await this.constructor.generateCouponCode();
+  }
 
-    this.couponCode = upper(this.couponCode);
-    this.couponName = clean(this.couponName);
+  this.couponCode = upper(this.couponCode);
+  this.couponName = clean(this.couponName);
 
-    if (this.discountType === "percentage" && this.discountValue > 100) {
-      throw new Error("Percentage discount cannot exceed 100");
-    }
+  if (this.discountType === "percentage" && this.discountValue > 100) {
+    throw new Error("Percentage discount cannot exceed 100");
+  }
 
-    if (this.startsAt && this.endsAt && this.startsAt > this.endsAt) {
-      throw new Error("Invalid date range");
-    }
+  if (this.startsAt && this.endsAt && this.startsAt > this.endsAt) {
+    throw new Error("Invalid date range");
+  }
 
-    // normalize arrays
-    this.productCodes = [...new Set(toArr(this.productCodes).map(upper).filter(Boolean))];
-    this.excludedProductCodes = [...new Set(toArr(this.excludedProductCodes).map(upper).filter(Boolean))];
-    this.tags = [...new Set(toArr(this.tags).map(lower).filter(Boolean))];
+  this.productCodes = [...new Set(toArr(this.productCodes).map(upper).filter(Boolean))];
+  this.excludedProductCodes = [...new Set(toArr(this.excludedProductCodes).map(upper).filter(Boolean))];
+  this.tags = [...new Set(toArr(this.tags).map(lower).filter(Boolean))];
 
-    this.allowedCustomerCodes = [...new Set(toArr(this.allowedCustomerCodes).map(upper).filter(Boolean))];
-    this.blockedCustomerCodes = [...new Set(toArr(this.blockedCustomerCodes).map(upper).filter(Boolean))];
+  this.allowedCustomerCodes = [...new Set(toArr(this.allowedCustomerCodes).map(upper).filter(Boolean))];
+  this.blockedCustomerCodes = [...new Set(toArr(this.blockedCustomerCodes).map(upper).filter(Boolean))];
 
-    this.allowedEmails = [...new Set(toArr(this.allowedEmails).map(lower).filter(Boolean))];
-    this.blockedEmails = [...new Set(toArr(this.blockedEmails).map(lower).filter(Boolean))];
+  this.allowedEmails = [...new Set(toArr(this.allowedEmails).map(lower).filter(Boolean))];
+  this.blockedEmails = [...new Set(toArr(this.blockedEmails).map(lower).filter(Boolean))];
 
-    this.allowedPaymentMethods = [...new Set(toArr(this.allowedPaymentMethods).map(lower).filter(Boolean))];
-    this.excludedPaymentMethods = [...new Set(toArr(this.excludedPaymentMethods).map(lower).filter(Boolean))];
+  this.allowedPaymentMethods = [...new Set(toArr(this.allowedPaymentMethods).map(lower).filter(Boolean))];
+  this.excludedPaymentMethods = [...new Set(toArr(this.excludedPaymentMethods).map(lower).filter(Boolean))];
 
-    // auto expire
-    if (this.endsAt && new Date() > this.endsAt) {
-      this.status = "expired";
-      this.isActive = false;
-    }
-
-    next();
-  } catch (err) {
-    next(err);
+  if (this.endsAt && new Date() > this.endsAt) {
+    this.status = "expired";
+    this.isActive = false;
   }
 });
 

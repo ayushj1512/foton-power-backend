@@ -322,6 +322,12 @@ const productSchema = new Schema(
       index: true,
     },
 
+    isTrending: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
+
     status: {
       type: String,
       enum: PRODUCT_STATUSES,
@@ -596,6 +602,7 @@ productSchema.index({ categorySlug: 1, subcategorySlug: 1, status: 1, createdAt:
 productSchema.index({ collections: 1, status: 1, createdAt: -1 });
 productSchema.index({ isFeatured: 1, status: 1, createdAt: -1 });
 productSchema.index({ isBestSeller: 1, status: 1, soldCount: -1 });
+productSchema.index({ isTrending: 1, status: 1, createdAt: -1 });
 productSchema.index({ discountPrice: 1, status: 1 });
 productSchema.index({ mrp: 1, status: 1 });
 productSchema.index({ stock: 1, status: 1 });
