@@ -4,6 +4,8 @@ dotenv.config();
 import express from "express";
 import cors from "cors";
 import mongoose from "mongoose";
+import path from "path";
+import { fileURLToPath } from "url";
 
 import cloudinaryRoutes from "./cloudinary/cloudinary.routes.js";
 import adminUsersRoute from "./adminUsers/adminUsersRoute.js";
@@ -21,6 +23,17 @@ import couponRoutes from "./coupon/coupon.routes.js";
 import customerRoutes from "./customer/customer.routes.js";
 
 const app = express();
+
+/* =========================================================
+   PATH SETUP
+========================================================= */
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+/* =========================================================
+   STATIC FILES
+========================================================= */
+app.use(express.static(path.join(__dirname, "public")));
 
 /* =========================================================
    CORS
@@ -83,6 +96,10 @@ app.get("/", (_req, res) => {
 
 app.get("/ping", (_req, res) => {
   res.status(200).send("pong");
+});
+
+app.get("/favicon.ico", (_req, res) => {
+  res.sendFile(path.join(__dirname, "public", "favicon", "favicon.ico"));
 });
 
 app.get("/api/test", (_req, res) => {
