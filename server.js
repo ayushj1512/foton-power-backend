@@ -23,9 +23,37 @@ import customerRoutes from "./customer/customer.routes.js";
 const app = express();
 
 /* =========================================================
-   CORE MIDDLEWARE
+   CORS
 ========================================================= */
-app.use(cors());
+const allowedOrigins = [
+  "http://localhost:3000",
+  "http://localhost:3001",
+  "http://127.0.0.1:3000",
+  "http://127.0.0.1:3001",
+  "https://fotonpower.in",
+  "https://www.fotonpower.in",
+  "https://admin.fotonpower.in",
+];
+
+const corsOptions = {
+  origin(origin, callback) {
+    // allow requests without origin (Postman, server-to-server, webhooks, health checks)
+    if (!origin) return callback(null, true);
+
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+
+    console.warn("❌ Blocked by CORS:", origin);
+    return callback(new Error(`CORS not allowed for origin: ${origin}`));
+  },
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+};
+
+app.use(cors(corsOptions));
+app.options(/.*/, cors(corsOptions));
 
 /* Razorpay webhook needs raw body */
 app.use("/api/razorpay/webhook", express.raw({ type: "application/json" }));

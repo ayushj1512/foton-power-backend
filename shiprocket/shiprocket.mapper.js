@@ -1,3 +1,4 @@
+import shiprocketConfig from "./shiprocket.config.js";
 import { DEFAULT_PACKAGE, PAYMENT_METHOD } from "./shiprocket.constants.js";
 
 const safeNumber = (value, fallback = 0) => {
@@ -16,15 +17,28 @@ export function mapOrderToShiprocketPayload(order, options = {}) {
   const height = safeNumber(options.height, DEFAULT_PACKAGE.height);
   const weight = safeNumber(options.weight, DEFAULT_PACKAGE.weight);
 
+  const subTotal = safeNumber(order.subtotal, 0);
+  const couponDiscount = safeNumber(order.couponDiscount, 0);
+  const additionalDiscount = safeNumber(order.additionalDiscount, 0);
+  const shippingCharges = safeNumber(order.shippingCharge, 0);
+  const codCharge = safeNumber(order.codCharge, 0);
+  const payableAmount = safeNumber(order.payableAmount, 0);
+
+  const orderLevelDiscount = couponDiscount + additionalDiscount;
+
   return {
-    order_id: order.orderNumber,
+    order_id: String(order.orderNumber || order._id || ""),
     order_date: new Date(order.createdAt || Date.now())
       .toISOString()
       .slice(0, 19)
       .replace("T", " "),
-    pickup_location: options.pickupLocation || "Primary",
+    pickup_location:
+      options.pickupLocation ||
+      shiprocketConfig.defaultPickupLocation ||
+      "Primary",
 
-    billing_customer_name: billing.fullName || order?.customer?.fullName || "Customer",
+    billing_customer_name:
+      billing.fullName || order?.customer?.fullName || "Customer",
     billing_last_name: "",
     billing_address: billing.addressLine1 || "",
     billing_address_2: billing.addressLine2 || "",
@@ -36,7 +50,8 @@ export function mapOrderToShiprocketPayload(order, options = {}) {
     billing_phone: String(billing.phone || order?.customer?.phone || ""),
 
     shipping_is_billing: false,
-    shipping_customer_name: shipping.fullName || order?.customer?.fullName || "Customer",
+    shipping_customer_name:
+      shipping.fullName || order?.customer?.fullName || "Customer",
     shipping_last_name: "",
     shipping_address: shipping.addressLine1 || "",
     shipping_address_2: shipping.addressLine2 || "",
@@ -51,11 +66,11 @@ export function mapOrderToShiprocketPayload(order, options = {}) {
       name: item.name || `Item ${index + 1}`,
       sku: item.sku || item.productCode || `SKU-${index + 1}`,
       units: safeNumber(item.quantity, 1),
-      selling_price: safeNumber(item.unitPayable, item.discountPrice || item.mrp || 0),
-      discount: Math.max(
-        safeNumber(item.mrp, 0) - safeNumber(item.unitPayable, item.discountPrice || 0),
-        0
+      selling_price: safeNumber(
+        item.unitPayable,
+        item.discountPrice || item.mrp || 0
       ),
+      discount: 0,
       tax: 0,
       hsn: item.hsnCode || "",
     })),
@@ -63,9 +78,13 @@ export function mapOrderToShiprocketPayload(order, options = {}) {
     payment_method:
       payment.method === "cod" ? PAYMENT_METHOD.COD : PAYMENT_METHOD.PREPAID,
 
-    sub_total: safeNumber(order.subtotal, 0),
-    shipping_charges: safeNumber(order.shippingCharge, 0),
-    total_discount: safeNumber(order.totalDiscount, 0),
+    sub_total: subTotal,
+    shipping_charges: shippingCharges + codCharge,
+    total_discount: orderLevelDiscount,
+
+    // important for COD
+    collectable_amount:
+      payment.method === "cod" ? payableAmount : 0,
 
     length,
     breadth,
@@ -76,7 +95,9 @@ export function mapOrderToShiprocketPayload(order, options = {}) {
 
 export function getServiceabilityPayload(order, options = {}) {
   return {
-    pickup_postcode: String(options.pickupPincode || ""),
+    pickup_postcode: String(
+      options.pickupPincode || shiprocketConfig.pickupPincode || ""
+    ),
     delivery_postcode: String(order?.shippingAddress?.pincode || ""),
     cod: order?.payment?.method === "cod" ? 1 : 0,
     weight: safeNumber(options.weight, DEFAULT_PACKAGE.weight),

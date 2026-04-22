@@ -7,6 +7,8 @@ import {
   findOrCreateCustomerByPhone,
   normalizeOrderCustomerSnapshot,
 } from "../customer/customer.utils.js";
+import { autoBookOrder } from "../shiprocket/shiprocket.service.js";
+import shiprocketConfig from "../shiprocket/shiprocket.config.js";
 
 const { Types } = mongoose;
 
@@ -243,6 +245,49 @@ const validateNormalizedItems = (items = []) => {
   });
 };
 
+const canAutoBookOrder = (order, nextStatus = "") => {
+  if (!order) return false;
+
+  const status = cleanString(nextStatus || order.orderStatus).toLowerCase();
+  const isBooked = Boolean(order?.shipment?.shiprocket?.isBooked);
+  const blockedStatuses = ["cancelled", "failed", "rto", "delivered"];
+  const allowedStatuses = ["processing", "packed", "picked", "confirmed"];
+
+  if (isBooked) return false;
+  if (blockedStatuses.includes(status)) return false;
+
+  return Boolean(order.isConfirmed || allowedStatuses.includes(status));
+};
+
+const tryAutoBookShiprocket = async (order) => {
+  if (!canAutoBookOrder(order)) return order;
+
+  const pickupPincode = cleanString(shiprocketConfig.pickupPincode);
+  const pickupLocation = cleanString(shiprocketConfig.defaultPickupLocation);
+
+  if (!pickupPincode) {
+    console.warn(
+      `[SHIPROCKET_AUTO_BOOK] skipped for ${order?.orderNumber}: SHIPROCKET_PICKUP_PINCODE missing`
+    );
+    return order;
+  }
+
+  try {
+    const bookingResult = await autoBookOrder(order._id, {
+      pickupPincode,
+      pickupLocation,
+    });
+
+    return bookingResult?.order || order;
+  } catch (error) {
+    console.error(
+      `[SHIPROCKET_AUTO_BOOK] failed for ${order?.orderNumber}:`,
+      error?.message || error
+    );
+    return await Order.findById(order._id);
+  }
+};
+
 /* =========================================================
    CREATE ORDER
 ========================================================= */
@@ -299,11 +344,12 @@ export const createOrder = async (req, res) => {
     });
 
     const savedOrder = await order.save();
+    const finalOrder = await tryAutoBookShiprocket(savedOrder);
 
     return res.status(201).json({
       success: true,
       message: "Order created successfully",
-      order: savedOrder,
+      order: finalOrder,
       customer: syncedCustomer || null,
     });
   } catch (error) {
@@ -505,11 +551,12 @@ export const updateOrder = async (req, res) => {
     order.updatedBy = req.user?._id || null;
 
     const updatedOrder = await order.save();
+    const finalOrder = await tryAutoBookShiprocket(updatedOrder);
 
     return res.status(200).json({
       success: true,
       message: "Order updated successfully",
-      order: updatedOrder,
+      order: finalOrder,
     });
   } catch (error) {
     console.error("updateOrder error:", error);
@@ -561,11 +608,12 @@ export const updateOrderStatus = async (req, res) => {
     order.updatedBy = req.user?._id || null;
 
     const updatedOrder = await order.save();
+    const finalOrder = await tryAutoBookShiprocket(updatedOrder);
 
     return res.status(200).json({
       success: true,
       message: "Order status updated successfully",
-      order: updatedOrder,
+      order: finalOrder,
     });
   } catch (error) {
     console.error("updateOrderStatus error:", error);

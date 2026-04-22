@@ -7,8 +7,11 @@ const shiprocketConfig = {
   password: process.env.SHIPROCKET_PASSWORD || "",
   defaultPickupLocation:
     process.env.SHIPROCKET_DEFAULT_PICKUP_LOCATION || "Primary",
+  pickupPincode: process.env.SHIPROCKET_PICKUP_PINCODE || "",
 
-  tokenBufferSeconds: Number(process.env.SHIPROCKET_TOKEN_BUFFER_SECONDS || 300),
+  tokenBufferSeconds: Number(
+    process.env.SHIPROCKET_TOKEN_BUFFER_SECONDS || 300
+  ),
 };
 
 export default shiprocketConfig;
