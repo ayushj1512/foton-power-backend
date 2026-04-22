@@ -562,7 +562,10 @@ orderSchema.methods.recalculateTotals = function () {
   const items = Array.isArray(this.items) ? this.items : [];
 
   this.totalItems = items.length;
-  this.totalQty = items.reduce((sum, item) => sum + Number(item.quantity || 0), 0);
+  this.totalQty = items.reduce(
+    (sum, item) => sum + Number(item.quantity || 0),
+    0
+  );
 
   this.itemsMrpTotal = items.reduce(
     (sum, item) => sum + Number(item.lineMrpTotal || 0),
@@ -580,7 +583,8 @@ orderSchema.methods.recalculateTotals = function () {
   const additionalDiscount = Number(this.additionalDiscount || 0);
 
   this.couponDiscount = couponDiscount;
-  this.totalDiscount = this.itemsDiscountTotal + couponDiscount + additionalDiscount;
+  this.totalDiscount =
+    this.itemsDiscountTotal + couponDiscount + additionalDiscount;
 
   this.subtotal = items.reduce(
     (sum, item) => sum + Number(item.linePayableTotal || 0),
@@ -611,105 +615,104 @@ orderSchema.methods.recalculateTotals = function () {
 ------------------------------------------------------- */
 orderSchema.statics.generateOrderNumber = async function () {
   const counter = await Counter.findOneAndUpdate(
-    { name: "orderNumber" },
-    { $inc: { seq: 1 } },
-    { new: true, upsert: true, setDefaultsOnInsert: true }
+    { key: "orderNumber" },
+    {
+      $inc: { seq: 1 },
+      $setOnInsert: { key: "orderNumber" },
+    },
+    {
+      upsert: true,
+      returnDocument: "after",
+      setDefaultsOnInsert: true,
+    }
   );
 
-  return `MIRAY-${String(counter.seq).padStart(6, "0")}`;
+  return String(counter.seq);
 };
 
 /* -------------------------------------------------------
    Hooks
 ------------------------------------------------------- */
-orderSchema.pre("validate", async function (next) {
-  try {
-    if (!this.orderNumber) {
-      this.orderNumber = await this.constructor.generateOrderNumber();
+orderSchema.pre("validate", async function () {
+  if (!this.orderNumber) {
+    this.orderNumber = await this.constructor.generateOrderNumber();
+  }
+
+  if (this.customer) {
+    this.customer.customerCode = upper(this.customer.customerCode);
+    this.customer.email = lower(this.customer.email);
+    this.customer.phone = digits(this.customer.phone).slice(-10);
+    this.customer.alternatePhone = digits(this.customer.alternatePhone).slice(
+      -10
+    );
+
+    if (!clean(this.customer.fullName)) {
+      this.customer.fullName = clean(
+        `${this.customer.firstName || ""} ${this.customer.lastName || ""}`
+      );
     }
+  }
 
-    if (this.customer) {
-      this.customer.customerCode = upper(this.customer.customerCode);
-      this.customer.email = lower(this.customer.email);
-      this.customer.phone = digits(this.customer.phone).slice(-10);
-      this.customer.alternatePhone = digits(this.customer.alternatePhone).slice(-10);
+  if (this.billingAddress) {
+    this.billingAddress.email = lower(this.billingAddress.email);
+    this.billingAddress.phone = digits(this.billingAddress.phone).slice(-10);
+  }
 
-      if (!clean(this.customer.fullName)) {
-        this.customer.fullName = clean(
-          `${this.customer.firstName || ""} ${this.customer.lastName || ""}`
+  if (this.shippingAddress) {
+    this.shippingAddress.email = lower(this.shippingAddress.email);
+    this.shippingAddress.phone = digits(this.shippingAddress.phone).slice(-10);
+  }
+
+  if (this.couponCode && !this.coupon?.code) {
+    this.coupon = {
+      ...(this.coupon?.toObject ? this.coupon.toObject() : this.coupon),
+      code: upper(this.couponCode),
+      discountAmount: Number(
+        this.coupon?.discountAmount || this.couponDiscount || 0
+      ),
+    };
+  }
+
+  this.couponCode = upper(this.couponCode || this.coupon?.code || "");
+
+  if (Array.isArray(this.items)) {
+    this.items = this.items.map((item) => {
+      const raw = item?.toObject ? item.toObject() : item;
+
+      const quantity = Number(raw.quantity || 0);
+      const mrp = Number(raw.mrp || 0);
+      const discountPrice = Number(raw.discountPrice || 0);
+      const unitPayable = Number(raw.unitPayable || 0) || discountPrice || mrp;
+
+      if (discountPrice > mrp && mrp > 0) {
+        throw new Error(
+          `Discount price cannot be greater than MRP for ${raw.name}`
         );
       }
-    }
 
-    if (this.billingAddress) {
-      this.billingAddress.email = lower(this.billingAddress.email);
-      this.billingAddress.phone = digits(this.billingAddress.phone).slice(-10);
-    }
-
-    if (this.shippingAddress) {
-      this.shippingAddress.email = lower(this.shippingAddress.email);
-      this.shippingAddress.phone = digits(this.shippingAddress.phone).slice(-10);
-    }
-
-    if (this.couponCode && !this.coupon?.code) {
-      this.coupon = {
-        ...(this.coupon?.toObject ? this.coupon.toObject() : this.coupon),
-        code: upper(this.couponCode),
-        discountAmount: Number(
-          this.coupon?.discountAmount || this.couponDiscount || 0
-        ),
+      return {
+        ...raw,
+        productCode: upper(raw.productCode),
+        sku: upper(raw.sku),
+        size: upper(raw.size),
+        lineMrpTotal: mrp * quantity,
+        lineDiscountTotal: Math.max((mrp - discountPrice) * quantity, 0),
+        linePayableTotal: unitPayable * quantity,
       };
-    }
-
-    this.couponCode = upper(this.couponCode || this.coupon?.code || "");
-
-    if (Array.isArray(this.items)) {
-      this.items = this.items.map((item) => {
-        const raw = item?.toObject ? item.toObject() : item;
-
-        const quantity = Number(raw.quantity || 0);
-        const mrp = Number(raw.mrp || 0);
-        const discountPrice = Number(raw.discountPrice || 0);
-        const unitPayable = Number(raw.unitPayable || 0) || discountPrice || mrp;
-
-        if (discountPrice > mrp && mrp > 0) {
-          throw new Error(`Discount price cannot be greater than MRP for ${raw.name}`);
-        }
-
-        return {
-          ...raw,
-          productCode: upper(raw.productCode),
-          sku: upper(raw.sku),
-          size: upper(raw.size),
-          lineMrpTotal: mrp * quantity,
-          lineDiscountTotal: Math.max((mrp - discountPrice) * quantity, 0),
-          linePayableTotal: unitPayable * quantity,
-        };
-      });
-    }
-
-    this.recalculateTotals();
-    next();
-  } catch (error) {
-    next(error);
+    });
   }
+
+  this.recalculateTotals();
 });
 
 /* -------------------------------------------------------
    Indexes
+   Only keep compound/custom indexes here
 ------------------------------------------------------- */
 orderSchema.index({ createdAt: -1 });
 orderSchema.index({ orderStatus: 1, createdAt: -1 });
 orderSchema.index({ "payment.method": 1, "payment.status": 1, createdAt: -1 });
-orderSchema.index({ "customer.phone": 1, createdAt: -1 });
-orderSchema.index({ "customer.customerCode": 1, createdAt: -1 });
-orderSchema.index({ "customer.email": 1, createdAt: -1 });
-orderSchema.index({ "items.productCode": 1, createdAt: -1 });
-orderSchema.index({ "shipment.awbNumber": 1 });
-orderSchema.index({ "shipment.shiprocket.shipmentId": 1 });
-orderSchema.index({ "shipment.shiprocket.shiprocketOrderId": 1 });
-orderSchema.index({ "shipment.shiprocket.channelOrderId": 1 });
-orderSchema.index({ deliveredAt: -1 });
 
-const Order = mongoose.model("Order", orderSchema);
+const Order = mongoose.models.Order || mongoose.model("Order", orderSchema);
+
 export default Order;

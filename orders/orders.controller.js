@@ -36,7 +36,9 @@ const applyStatusDates = (order, nextStatus) => {
 
     if (!order.shipment?.deliveredAt) {
       order.shipment = {
-        ...(order.shipment?.toObject ? order.shipment.toObject() : order.shipment || {}),
+        ...(order.shipment?.toObject
+          ? order.shipment.toObject()
+          : order.shipment || {}),
         deliveredAt: new Date(),
       };
     }
@@ -48,7 +50,9 @@ const applyStatusDates = (order, nextStatus) => {
 
   if (nextStatus === "shipped" && !order.shipment?.shippedAt) {
     order.shipment = {
-      ...(order.shipment?.toObject ? order.shipment.toObject() : order.shipment || {}),
+      ...(order.shipment?.toObject
+        ? order.shipment.toObject()
+        : order.shipment || {}),
       shippedAt: new Date(),
     };
   }
@@ -74,7 +78,9 @@ const buildOrderFilters = (query = {}) => {
   }
 
   if (cleanString(query.customerCode)) {
-    filter["customer.customerCode"] = String(query.customerCode).trim().toUpperCase();
+    filter["customer.customerCode"] = String(query.customerCode)
+      .trim()
+      .toUpperCase();
   }
 
   if (cleanString(query.phone)) {
@@ -133,6 +139,110 @@ const buildOrderFilters = (query = {}) => {
   return filter;
 };
 
+const normalizeOrderItem = (item = {}) => {
+  const raw = item?.toObject ? item.toObject() : item;
+
+  const productCode = cleanString(
+    raw.productCode || raw.code || raw.skuCode || raw.product?.productCode
+  ).toUpperCase();
+
+  const productId =
+    raw.productId ||
+    raw.product?._id ||
+    raw.product?._id?.toString?.() ||
+    raw._id ||
+    raw.id ||
+    null;
+
+  const name = cleanString(
+    raw.name || raw.productName || raw.title || raw.product?.name
+  );
+
+  const quantity = Math.max(1, cleanNumber(raw.quantity, 1));
+
+  const mrp = cleanNumber(
+    raw.mrp ??
+      raw.compareAtPrice ??
+      raw.originalPrice ??
+      raw.price ??
+      raw.product?.mrp ??
+      raw.product?.price,
+    0
+  );
+
+  const discountPrice = cleanNumber(
+    raw.discountPrice ??
+      raw.sellingPrice ??
+      raw.salePrice ??
+      raw.finalPrice ??
+      raw.price ??
+      raw.product?.discountPrice ??
+      raw.product?.sellingPrice ??
+      raw.product?.price,
+    mrp
+  );
+
+  const unitPayable = cleanNumber(
+    raw.unitPayable ??
+      raw.finalPrice ??
+      raw.sellingPrice ??
+      raw.discountPrice ??
+      raw.price,
+    discountPrice || mrp
+  );
+
+  return {
+    productId,
+    variantId: raw.variantId || raw.variant?._id || null,
+    productCode,
+    sku: cleanString(raw.sku || raw.skuCode || raw.product?.sku).toUpperCase(),
+    name,
+    color: cleanString(raw.color || raw.variant?.color || raw.product?.color),
+    size: cleanString(raw.size || raw.variant?.size).toUpperCase(),
+    image: cleanString(
+      raw.image ||
+        raw.imageUrl ||
+        raw.thumbnail ||
+        raw.product?.image ||
+        raw.product?.imageUrl
+    ),
+    hsnCode: cleanString(raw.hsnCode || raw.product?.hsnCode),
+    taxClass: cleanString(raw.taxClass || raw.product?.taxClass),
+    quantity,
+    mrp,
+    discountPrice,
+    unitPayable,
+  };
+};
+
+const validateNormalizedItems = (items = []) => {
+  if (!Array.isArray(items) || items.length === 0) {
+    throw new Error("At least one order item is required");
+  }
+
+  items.forEach((item, index) => {
+    if (!cleanString(item.productCode)) {
+      throw new Error(`items.${index}.productCode is required`);
+    }
+
+    if (!cleanString(item.name)) {
+      throw new Error(`items.${index}.name is required`);
+    }
+
+    if (!Number.isFinite(Number(item.mrp))) {
+      throw new Error(`items.${index}.mrp is required`);
+    }
+
+    if (!Number.isFinite(Number(item.discountPrice))) {
+      throw new Error(`items.${index}.discountPrice is required`);
+    }
+
+    if (!Number.isFinite(Number(item.unitPayable))) {
+      throw new Error(`items.${index}.unitPayable is required`);
+    }
+  });
+};
+
 /* =========================================================
    CREATE ORDER
 ========================================================= */
@@ -142,8 +252,33 @@ export const createOrder = async (req, res) => {
     const firebaseUid = cleanString(body.firebaseUid);
     const orderDate = new Date();
 
+    const normalizedItems = Array.isArray(body.items)
+      ? body.items.map(normalizeOrderItem)
+      : [];
+
+    validateNormalizedItems(normalizedItems);
+
+    const normalizedCustomer = {
+      ...(body.customer || {}),
+      email: normalizeEmail(
+        body.customer?.email ||
+          body.shippingAddress?.email ||
+          body.billingAddress?.email
+      ),
+      phone: normalizePhone(
+        body.customer?.phone ||
+          body.shippingAddress?.phone ||
+          body.billingAddress?.phone
+      ),
+      fullName:
+        cleanString(body.customer?.fullName) ||
+        cleanString(body.shippingAddress?.fullName) ||
+        cleanString(body.billingAddress?.fullName) ||
+        "",
+    };
+
     const syncedCustomer = await findOrCreateCustomerByPhone({
-      customer: body.customer || {},
+      customer: normalizedCustomer,
       shippingAddress: body.shippingAddress || {},
       billingAddress: body.billingAddress || {},
       gstDetails: body.gstDetails || {},
@@ -153,8 +288,9 @@ export const createOrder = async (req, res) => {
 
     const order = new Order({
       ...body,
+      items: normalizedItems,
       customer: normalizeOrderCustomerSnapshot({
-        customer: body.customer || {},
+        customer: normalizedCustomer,
         syncedCustomer,
         firebaseUid,
       }),
@@ -184,7 +320,10 @@ export const createOrder = async (req, res) => {
 ========================================================= */
 export const getOrders = async (req, res) => {
   try {
-    const { page, limit, skip } = cleanPagination(req.query.page, req.query.limit);
+    const { page, limit, skip } = cleanPagination(
+      req.query.page,
+      req.query.limit
+    );
     const sortBy = cleanString(req.query.sortBy) || "createdAt";
     const sortOrder = req.query.sortOrder === "asc" ? 1 : -1;
 
@@ -263,7 +402,7 @@ export const getOrderByOrderNumber = async (req, res) => {
   try {
     const { orderNumber } = req.params;
 
-    const normalizedOrderNumber = cleanString(orderNumber).toUpperCase();
+    const normalizedOrderNumber = cleanString(orderNumber);
 
     if (!normalizedOrderNumber) {
       return res.status(400).json({
@@ -323,7 +462,6 @@ export const updateOrder = async (req, res) => {
       "billingAddress",
       "shippingAddress",
       "sameAsBilling",
-      "items",
       "coupon",
       "couponCode",
       "couponDiscount",
@@ -346,6 +484,14 @@ export const updateOrder = async (req, res) => {
       if (body[key] !== undefined) {
         order[key] = body[key];
       }
+    }
+
+    if (body.items !== undefined) {
+      const normalizedItems = Array.isArray(body.items)
+        ? body.items.map(normalizeOrderItem)
+        : [];
+      validateNormalizedItems(normalizedItems);
+      order.items = normalizedItems;
     }
 
     if (body.orderStatus) {
