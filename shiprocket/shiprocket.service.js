@@ -52,6 +52,39 @@ function getOrderIdFromBooking(booking, fallback = "") {
   );
 }
 
+function getWebhookValue(payload, paths = []) {
+  for (const path of paths) {
+    const value = String(path || "")
+      .split(".")
+      .reduce((acc, part) => acc?.[part], payload);
+
+    if (value !== undefined && value !== null && String(value).trim() !== "") {
+      return String(value).trim();
+    }
+  }
+  return "";
+}
+
+export function mapWebhookStatusToOrderStatus(status = "") {
+  const value = String(status || "").trim().toLowerCase();
+
+  if (!value) return "";
+
+  if (value.includes("delivered")) return "delivered";
+  if (value.includes("out for delivery")) return "out_for_delivery";
+
+  if (
+    value.includes("shipped") ||
+    value.includes("in transit") ||
+    value.includes("pickup") ||
+    value.includes("manifest")
+  ) {
+    return "shipped";
+  }
+
+  return "";
+}
+
 export async function getPickupLocations() {
   try {
     const { data } = await shiprocketClient.get("/settings/company/pickup");
@@ -460,5 +493,114 @@ export async function syncTracking(orderId) {
     message: "Tracking synced successfully",
     order,
     tracking,
+  };
+}
+
+export async function processShiprocketWebhook(payload = {}) {
+  const status = getWebhookValue(payload, [
+    "current_status",
+    "shipment_status",
+    "status",
+    "tracking_status",
+    "data.current_status",
+    "data.shipment_status",
+    "data.status",
+    "data.tracking_status",
+  ]);
+
+  const awbNumber = getWebhookValue(payload, [
+    "awb",
+    "awb_code",
+    "tracking_number",
+    "data.awb",
+    "data.awb_code",
+    "data.tracking_number",
+  ]);
+
+  const orderNumber = getWebhookValue(payload, [
+    "order_number",
+    "channel_order_id",
+    "reference_number",
+    "data.order_number",
+    "data.channel_order_id",
+    "data.reference_number",
+  ]);
+
+  const shipmentId = getWebhookValue(payload, [
+    "shipment_id",
+    "data.shipment_id",
+  ]);
+
+  let order = null;
+
+  if (shipmentId) {
+    order = await Order.findOne({
+      "shipment.shiprocket.shipmentId": shipmentId,
+    });
+  }
+
+  if (!order && orderNumber) {
+    order = await Order.findOne({
+      $or: [
+        { orderNumber },
+        { "shipment.shiprocket.channelOrderId": orderNumber },
+      ],
+    });
+  }
+
+  if (!order && awbNumber) {
+    order = await Order.findOne({
+      $or: [
+        { "shipment.awbNumber": awbNumber },
+        { "shipment.trackingNumber": awbNumber },
+      ],
+    });
+  }
+
+  if (!order) {
+    return {
+      success: true,
+      matched: false,
+      message: "Webhook received but order not found",
+    };
+  }
+
+  const previousShipment = getShipmentObject(order);
+  const previousShiprocket = getShiprocketObject(order);
+  const mappedOrderStatus = mapWebhookStatusToOrderStatus(status);
+
+  order.shipment = {
+    ...previousShipment,
+    awbNumber: awbNumber || previousShipment?.awbNumber || "",
+    trackingNumber: awbNumber || previousShipment?.trackingNumber || "",
+    status: status || previousShipment?.status || "",
+    shiprocket: {
+      ...previousShiprocket,
+      trackingRaw: payload,
+      syncedAt: new Date(),
+      lastError: "",
+      lastErrorRaw: null,
+    },
+  };
+
+  if (mappedOrderStatus) {
+    order.orderStatus = mappedOrderStatus;
+  }
+
+  if (mappedOrderStatus === "delivered") {
+    order.deliveredAt = order.deliveredAt || new Date();
+    order.shipment.deliveredAt = order.shipment.deliveredAt || new Date();
+  }
+
+  await order.save();
+
+  return {
+    success: true,
+    matched: true,
+    message: "Webhook processed successfully",
+    orderId: String(order._id),
+    orderNumber: order.orderNumber,
+    orderStatus: order.orderStatus,
+    shipmentStatus: order?.shipment?.status || "",
   };
 }

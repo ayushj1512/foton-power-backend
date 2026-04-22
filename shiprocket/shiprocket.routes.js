@@ -5,12 +5,16 @@ import {
   checkServiceabilityController,
   getShiprocketPickupLocationsController,
   manualBookOrderController,
+  shiprocketWebhookController, // 👈 add this
   syncTrackingController,
 } from "./shiprocket.controller.js";
 
 const router = express.Router();
 
 router.get("/pickup-locations", getShiprocketPickupLocationsController);
+
+// ✅ WEBHOOK (final piece)
+router.post("/webhook", shiprocketWebhookController);
 
 router.post("/orders/:orderId/serviceability", checkServiceabilityController);
 router.post("/orders/:orderId/auto-book", autoBookOrderController);

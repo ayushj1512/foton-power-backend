@@ -7,6 +7,7 @@ import {
   chooseCourier,
   getPickupLocations,
   manualBookOrder,
+  processShiprocketWebhook,
   syncTracking,
 } from "./shiprocket.service.js";
 import { getServiceabilityPayload } from "./shiprocket.mapper.js";
@@ -108,6 +109,16 @@ export async function cancelShiprocketOrderController(req, res) {
       message: "Shiprocket cancel request sent successfully",
       data: result,
     });
+  } catch (error) {
+    return sendError(res, error);
+  }
+}
+
+export async function shiprocketWebhookController(req, res) {
+  try {
+    const result = await processShiprocketWebhook(req.body || {});
+
+    return res.status(200).json(result);
   } catch (error) {
     return sendError(res, error);
   }
