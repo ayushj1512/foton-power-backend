@@ -43,14 +43,19 @@ const allowedOrigins = [
   "http://localhost:3001",
   "http://127.0.0.1:3000",
   "http://127.0.0.1:3001",
+
+  // Production domains
   "https://fotonpower.in",
   "https://www.fotonpower.in",
   "https://admin.fotonpower.in",
+
+  // ✅ NEW: Vercel preview domain
+  "https://foton-power-six.vercel.app",
 ];
 
 const corsOptions = {
   origin(origin, callback) {
-    // allow requests without origin (Postman, server-to-server, webhooks, health checks)
+    // allow server-to-server / Postman / webhooks
     if (!origin) return callback(null, true);
 
     if (allowedOrigins.includes(origin)) {
@@ -71,7 +76,7 @@ app.options(/.*/, cors(corsOptions));
 /* Razorpay webhook needs raw body */
 app.use("/api/razorpay/webhook", express.raw({ type: "application/json" }));
 
-/* JSON parser for all normal routes */
+/* JSON parser */
 app.use(express.json());
 
 /* =========================================================
