@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 import Counter from "../models/Counter.js";
 import Category from "../Category/Category.js";
 
+
 const { Schema } = mongoose;
 
 const clean = (v = "") => String(v || "").trim();
@@ -9,6 +10,16 @@ const upper = (v = "") => clean(v).toUpperCase();
 const lower = (v = "") => clean(v).toLowerCase();
 const toArray = (value) => (Array.isArray(value) ? value : []);
 const isValidObjectId = (value) => mongoose.Types.ObjectId.isValid(value);
+
+const syncProductAvailabilityStatus = (product) => {
+  const stock = Number(product.stock || 0);
+  const trackInventory = product.trackInventory !== false;
+  const allowBackorder = product.allowBackorder === true;
+
+  if (trackInventory && !allowBackorder && stock <= 0) {
+    product.status = "inactive";
+  }
+};
 
 const MEDIA_TYPES = ["image", "video"];
 const PRODUCT_STATUSES = ["draft", "active", "inactive", "archived"];
@@ -581,6 +592,7 @@ productSchema.pre("validate", async function () {
   if (Number(this.discountPrice) > Number(this.mrp)) {
     throw new Error("Discount price cannot be greater than MRP");
   }
+  syncProductAvailabilityStatus(this);
 });
 
 productSchema.index({

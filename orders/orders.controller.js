@@ -9,6 +9,7 @@ import {
 } from "../customer/customer.utils.js";
 import { autoBookOrder } from "../shiprocket/shiprocket.service.js";
 import shiprocketConfig from "../shiprocket/shiprocket.config.js";
+import Product from "../product/product.js";
 
 const { Types } = mongoose;
 
@@ -288,6 +289,37 @@ const tryAutoBookShiprocket = async (order) => {
   }
 };
 
+const updateStockAfterOrder = async (items = []) => {
+  for (const item of items) {
+    if (!item.productId) continue;
+
+    const product = await Product.findById(item.productId);
+    if (!product) continue;
+
+    const qty = Number(item.quantity || 1);
+
+    // 👉 VARIANT LEVEL STOCK
+    if (item.variantId && product.variants?.length) {
+      const variant = product.variants.id(item.variantId);
+
+      if (variant) {
+        variant.stock = Math.max(0, variant.stock - qty);
+        variant.soldCount = (variant.soldCount || 0) + qty;
+      }
+    } 
+    // 👉 PRODUCT LEVEL STOCK
+    else {
+      product.stock = Math.max(0, product.stock - qty);
+      product.soldCount = (product.soldCount || 0) + qty;
+    }
+
+    // recalc totals
+    product.recalculateStock?.();
+
+    await product.save();
+  }
+};
+
 /* =========================================================
    CREATE ORDER
 ========================================================= */
@@ -344,6 +376,7 @@ export const createOrder = async (req, res) => {
     });
 
     const savedOrder = await order.save();
+    await updateStockAfterOrder(savedOrder.items);
     const finalOrder = await tryAutoBookShiprocket(savedOrder);
 
     return res.status(201).json({
