@@ -2,6 +2,7 @@ import express from "express";
 import {
   createPaymentOrder,
   verifyPayment,
+  capturePayment,
   handleWebhook,
   getPaymentByOrderId,
   getPaymentStatusFromRazorpay,
@@ -13,6 +14,7 @@ const router = express.Router();
 
 router.post("/create-order", createPaymentOrder);
 router.post("/verify-payment", verifyPayment);
+router.post("/capture-payment", capturePayment);
 
 // webhook route yaha mount hoga but IMPORTANT:
 // server.js mei is path ke liye express.raw() use karna hai

@@ -17,6 +17,11 @@ import wishlistRoutes from "./wishlist/wishlist.routes.js";
 import orderRoutes from "./orders/orders.routes.js";
 import shiprocketRoutes from "./shiprocket/shiprocket.routes.js";
 import razorpayRoutes from "./razorpay/razorpay.routes.js";
+import {
+  capturePayment,
+  createPaymentOrder,
+  verifyPayment,
+} from "./razorpay/razorpay.controller.js";
 import metaRoutes from "./meta/meta.routes.js";
 import collectionRoutes from "./collection/collection.router.js";
 import couponRoutes from "./coupon/coupon.routes.js";
@@ -117,6 +122,10 @@ app.get("/api/test", (_req, res) => {
     message: "API working",
   });
 });
+
+app.post("/api/create-order", createPaymentOrder);
+app.post("/api/verify-payment", verifyPayment);
+app.post("/api/capture-payment", capturePayment);
 
 /* =========================================================
    HEALTH CHECK

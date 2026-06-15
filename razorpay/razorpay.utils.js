@@ -3,11 +3,11 @@ import razorpayConfig from "./razorpay.config.js";
 
 export function toPaise(amount) {
   const num = Number(amount || 0);
-  if (!Number.isFinite(num) || num <= 0) {
-    throw new Error("Invalid amount");
+  if (!Number.isInteger(num) || num < 100) {
+    throw new Error("Amount must be at least 100 paise");
   }
 
-  return Math.round(num * 100);
+  return num;
 }
 
 export function verifyPaymentSignature({
@@ -15,12 +15,22 @@ export function verifyPaymentSignature({
   paymentId,
   signature,
 }) {
+  if (!razorpayConfig.keySecret) {
+    throw new Error("Razorpay key secret is not configured");
+  }
+
   const expectedSignature = crypto
     .createHmac("sha256", razorpayConfig.keySecret)
     .update(`${orderId}|${paymentId}`)
     .digest("hex");
 
-  return expectedSignature === signature;
+  const expectedBuffer = Buffer.from(expectedSignature, "hex");
+  const signatureBuffer = Buffer.from(String(signature || ""), "hex");
+
+  return (
+    expectedBuffer.length === signatureBuffer.length &&
+    crypto.timingSafeEqual(expectedBuffer, signatureBuffer)
+  );
 }
 
 export function verifyWebhookSignature(rawBody, signature) {

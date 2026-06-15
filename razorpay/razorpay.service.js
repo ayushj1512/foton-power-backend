@@ -10,15 +10,25 @@ import {
 
 export async function createRazorpayOrder({
   amount,
+  currency = razorpayConfig.currency,
   receipt,
   notes = {},
   customer = {},
 }) {
   const amountInPaise = toPaise(amount);
+  const finalCurrency = String(currency || razorpayConfig.currency || "INR")
+    .trim()
+    .toUpperCase();
+
+  if (!razorpay) {
+    const error = new Error("Razorpay credentials are not configured");
+    error.status = 401;
+    throw error;
+  }
 
   const razorpayOrder = await razorpay.orders.create({
     amount: amountInPaise,
-    currency: razorpayConfig.currency,
+    currency: finalCurrency,
     receipt,
     notes,
   });
@@ -26,8 +36,8 @@ export async function createRazorpayOrder({
   const paymentDoc = await RazorpayPayment.create({
     receipt,
     notes,
-    amount,
-    currency: razorpayConfig.currency,
+    amount: amountInPaise / 100,
+    currency: finalCurrency,
     razorpayOrderId: razorpayOrder.id,
     status: "created",
     paymentStatus: "pending",
@@ -63,15 +73,56 @@ export async function verifyAndMarkPayment({
     throw new Error("Payment record not found for this Razorpay order");
   }
 
+  const razorpayPayment = await captureRazorpayPayment({
+    paymentId: razorpay_payment_id,
+    amount: Math.round(Number(payment.amount || 0) * 100),
+    currency: payment.currency,
+  });
+
   payment.razorpayPaymentId = razorpay_payment_id;
   payment.razorpaySignature = razorpay_signature;
-  payment.status = "paid";
+  payment.status =
+    razorpayPayment?.status === "captured" ? "captured" : "paid";
   payment.paymentStatus = "paid";
+  payment.method = razorpayPayment?.method || payment.method || "";
   payment.paidAt = new Date();
 
   await payment.save();
 
   return payment;
+}
+
+export async function captureRazorpayPayment({
+  paymentId,
+  amount,
+  currency = razorpayConfig.currency,
+}) {
+  if (!razorpay) {
+    const error = new Error("Razorpay credentials are not configured");
+    error.status = 401;
+    throw error;
+  }
+
+  if (!paymentId) {
+    throw new Error("paymentId is required");
+  }
+
+  const payment = await razorpay.payments.fetch(paymentId);
+
+  if (payment?.status === "captured") {
+    return payment;
+  }
+
+  if (payment?.status !== "authorized") {
+    throw new Error(`Payment cannot be captured from status: ${payment?.status}`);
+  }
+
+  const amountInPaise = toPaise(amount);
+  const finalCurrency = String(currency || razorpayConfig.currency || "INR")
+    .trim()
+    .toUpperCase();
+
+  return razorpay.payments.capture(paymentId, amountInPaise, finalCurrency);
 }
 
 export async function fetchPaymentById(paymentId) {

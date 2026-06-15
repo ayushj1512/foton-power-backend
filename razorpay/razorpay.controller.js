@@ -13,15 +13,24 @@ export async function createPaymentOrder(req, res) {
   try {
     const {
       amount,
+      currency = razorpayConfig.currency,
       receipt,
       notes = {},
       customer = {},
     } = req.body;
 
-    if (!amount) {
+    if (amount === undefined || amount === null || amount === "") {
       return res.status(400).json({
         success: false,
         message: "Amount is required",
+      });
+    }
+
+    const amountInPaise = Number(amount);
+    if (!Number.isInteger(amountInPaise) || amountInPaise < 100) {
+      return res.status(400).json({
+        success: false,
+        message: "Amount must be at least 100 paise",
       });
     }
 
@@ -29,7 +38,8 @@ export async function createPaymentOrder(req, res) {
       receipt || `receipt_${Date.now()}`;
 
     const { paymentDoc, razorpayOrder } = await createRazorpayOrder({
-      amount,
+      amount: amountInPaise,
+      currency,
       receipt: finalReceipt,
       notes,
       customer,
@@ -44,13 +54,18 @@ export async function createPaymentOrder(req, res) {
         amount: razorpayOrder.amount,
         currency: razorpayOrder.currency,
         receipt: razorpayOrder.receipt,
+        order_id: razorpayOrder.id,
         razorpayOrderId: razorpayOrder.id,
       },
     });
   } catch (error) {
-    return res.status(500).json({
+    const status = error.status || error.statusCode || 500;
+    return res.status(status === 401 ? 401 : 500).json({
       success: false,
-      message: "Failed to create Razorpay order",
+      message:
+        status === 401
+          ? "Razorpay authentication failed"
+          : "Failed to create Razorpay order",
       error: error.message,
     });
   }
@@ -214,6 +229,49 @@ export async function refundPayment(req, res) {
     return res.status(500).json({
       success: false,
       message: "Refund failed",
+      error: error.message,
+    });
+  }
+}
+
+export async function capturePayment(req, res) {
+  try {
+    const {
+      razorpay_order_id,
+      razorpay_payment_id,
+      razorpay_signature,
+    } = req.body;
+
+    if (
+      !razorpay_order_id ||
+      !razorpay_payment_id ||
+      !razorpay_signature
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Missing Razorpay capture fields",
+      });
+    }
+
+    const payment = await verifyAndMarkPayment({
+      razorpay_order_id,
+      razorpay_payment_id,
+      razorpay_signature,
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Payment captured successfully",
+      data: payment,
+    });
+  } catch (error) {
+    const status = error.status || error.statusCode || 500;
+    return res.status(status === 401 ? 401 : 400).json({
+      success: false,
+      message:
+        status === 401
+          ? "Razorpay authentication failed"
+          : "Payment capture failed",
       error: error.message,
     });
   }
