@@ -285,22 +285,62 @@ export const updateCollection = async (req, res) => {
       seo,
     } = req.body;
 
-    if (typeof name !== "undefined") collection.name = clean(name);
-    if (typeof slug !== "undefined") collection.slug = clean(slug).toLowerCase();
+    const nextName =
+      typeof name !== "undefined" ? clean(name) : collection.name;
+
+    const nextSlug =
+      typeof slug !== "undefined" && clean(slug)
+        ? slugify(slug)
+        : typeof name !== "undefined"
+          ? slugify(nextName)
+          : collection.slug;
+
+    if (!nextName) {
+      return res.status(400).json({
+        success: false,
+        message: "Collection name is required",
+      });
+    }
+
+    const duplicate = await Collection.findOne({
+      _id: { $ne: id },
+      $or: [{ name: nextName }, { slug: nextSlug }],
+    });
+
+    if (duplicate) {
+      return res.status(400).json({
+        success: false,
+        message: "Another collection with same name or slug already exists",
+      });
+    }
+
+    collection.name = nextName;
+    collection.slug = nextSlug;
+
     if (typeof description !== "undefined") {
       collection.description = clean(description);
     }
-    if (typeof image !== "undefined") collection.image = clean(image);
+
+    if (typeof image !== "undefined") {
+      collection.image = clean(image);
+    }
+
     if (typeof bannerImage !== "undefined") {
       collection.bannerImage = clean(bannerImage);
     }
-    if (typeof isActive !== "undefined") collection.isActive = toBool(isActive);
+
+    if (typeof isActive !== "undefined") {
+      collection.isActive = toBool(isActive);
+    }
+
     if (typeof isFeatured !== "undefined") {
       collection.isFeatured = toBool(isFeatured);
     }
+
     if (typeof showOnHomepage !== "undefined") {
       collection.showOnHomepage = toBool(showOnHomepage);
     }
+
     if (typeof sortOrder !== "undefined") {
       collection.sortOrder = toNum(sortOrder, 0);
     }
@@ -314,14 +354,18 @@ export const updateCollection = async (req, res) => {
         title:
           typeof seo.title !== "undefined"
             ? clean(seo.title)
-            : collection.seo?.title || "",
+            : collection.seo?.title || collection.name,
         description:
           typeof seo.description !== "undefined"
             ? clean(seo.description)
             : collection.seo?.description || "",
         keywords:
           typeof seo.keywords !== "undefined"
-            ? [...new Set((seo.keywords || []).map((k) => clean(k)).filter(Boolean))]
+            ? [
+                ...new Set(
+                  (seo.keywords || []).map((k) => clean(k)).filter(Boolean)
+                ),
+              ]
             : collection.seo?.keywords || [],
       };
     }
@@ -335,6 +379,17 @@ export const updateCollection = async (req, res) => {
     });
   } catch (error) {
     console.error("updateCollection error:", error);
+
+    if (error?.code === 11000) {
+      const field = Object.keys(error?.keyPattern || {})[0] || "field";
+
+      return res.status(400).json({
+        success: false,
+        message: `Collection ${field} already exists`,
+        error: error.message,
+      });
+    }
+
     return res.status(500).json({
       success: false,
       message: "Failed to update collection",

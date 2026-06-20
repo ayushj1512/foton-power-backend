@@ -639,3 +639,63 @@ export const getProductByIdOrCode = async (req, res) => {
     });
   }
 };
+
+
+const normalizeProductCode = (value = "") => {
+  const raw = String(value || "").trim().toUpperCase().replace(/\s+/g, "");
+  if (!raw) return "";
+  if (/^\d+$/.test(raw)) return raw.padStart(5, "0");
+  return raw;
+};
+
+export const getProductsByCodes = async (req, res) => {
+  try {
+    const rawCodes = String(req.query.codes || "")
+      .split(",")
+      .map(normalizeProductCode)
+      .filter(Boolean);
+
+    const codes = [...new Set(rawCodes)];
+
+    if (!codes.length) {
+      return res.status(400).json({
+        success: false,
+        message: "codes query is required",
+      });
+    }
+
+    const products = await Product.find({
+      productCode: { $in: codes },
+      status: "active",
+    }).populate(publicPopulate);
+
+    const mapped = products.map(attachSubcategoryDetails);
+
+    const orderedProducts = codes
+      .map((code) =>
+        mapped.find(
+          (item) => normalizeProductCode(item?.productCode) === code
+        )
+      )
+      .filter(Boolean);
+
+    const foundCodes = new Set(
+      orderedProducts.map((item) => normalizeProductCode(item?.productCode))
+    );
+
+    const missingCodes = codes.filter((code) => !foundCodes.has(code));
+
+    return res.json({
+      success: true,
+      products: orderedProducts,
+      missingCodes,
+      requestedCount: codes.length,
+      foundCount: orderedProducts.length,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: error.message || "Failed to fetch products by codes",
+    });
+  }
+};

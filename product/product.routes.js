@@ -7,28 +7,19 @@ import {
   updateProduct,
   getAllProducts,
   getProductByIdOrCode,
-  getProductsBySubcategory, // ✅ NEW
+  getProductsBySubcategory,
+  getProductsByCodes,
 } from "./product.controller.js";
 
 const router = express.Router();
 
-/* =========================================================
-   PUBLIC / CUSTOMER ROUTES
-========================================================= */
-
-// 🔹 get all products (filters supported)
+/* PUBLIC */
 router.get("/", getAllProducts);
-
-// 🔹 get products by subcategory (NEW)
+router.get("/codes", getProductsByCodes);
 router.get("/subcategory/:subcategory", getProductsBySubcategory);
-
-// 🔹 single product (KEEP LAST)
 router.get("/:idOrCode", getProductByIdOrCode);
 
-/* =========================================================
-   ADMIN ROUTES (NO MIDDLEWARE)
-========================================================= */
-
+/* ADMIN */
 router.post("/admin", createProduct);
 router.get("/admin/all", getAdminProducts);
 router.get("/admin/:id", getAdminProductById);
