@@ -22,6 +22,7 @@ import {
   createPaymentOrder,
   verifyPayment,
 } from "./razorpay/razorpay.controller.js";
+import { shiprocketWebhookController } from "./shiprocket/shiprocket.controller.js";
 import metaRoutes from "./meta/meta.routes.js";
 import collectionRoutes from "./collection/collection.router.js";
 import couponRoutes from "./coupon/coupon.routes.js";
@@ -53,18 +54,15 @@ const allowedOrigins = [
   "http://127.0.0.1:3002",
   "http://127.0.0.1:3003",
 
-  // Production domains
   "https://fotonpower.in",
   "https://www.fotonpower.in",
   "https://admin.fotonpower.in",
 
-  // ✅ NEW: Vercel preview domain
   "https://foton-power-six.vercel.app",
 ];
 
 const corsOptions = {
   origin(origin, callback) {
-    // allow server-to-server / Postman / webhooks
     if (!origin) return callback(null, true);
 
     if (allowedOrigins.includes(origin)) {
@@ -105,7 +103,7 @@ const connectDB = async () => {
    BASIC ROUTES
 ========================================================= */
 app.get("/", (_req, res) => {
-  res.send("🚀 Server is alive");
+  res.send("🚀 Foton server is alive");
 });
 
 app.get("/ping", (_req, res) => {
@@ -119,13 +117,23 @@ app.get("/favicon.ico", (_req, res) => {
 app.get("/api/test", (_req, res) => {
   res.json({
     success: true,
-    message: "API working",
+    message: "Foton API working",
   });
 });
 
 app.post("/api/create-order", createPaymentOrder);
 app.post("/api/verify-payment", verifyPayment);
 app.post("/api/capture-payment", capturePayment);
+
+/* =========================================================
+   SHIPROCKET WEBHOOK - DIRECT ROOT ROUTE
+   Final URL:
+   https://backend.fotonpower.in/foton-awb-status-listener-v2-8kq4m
+========================================================= */
+app.post(
+  "/foton-awb-status-listener-v2-8kq4m",
+  shiprocketWebhookController
+);
 
 /* =========================================================
    HEALTH CHECK
@@ -196,6 +204,6 @@ const PORT = process.env.PORT || 9000;
 
 connectDB().then(() => {
   app.listen(PORT, () => {
-    console.log(`🚀 Server running on port ${PORT}`);
+    console.log(`🚀 Foton server running on port ${PORT}`);
   });
 });
