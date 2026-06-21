@@ -5,22 +5,70 @@ import {
   checkServiceabilityController,
   getShiprocketPickupLocationsController,
   manualBookOrderController,
-  shiprocketWebhookController, // 👈 add this
+  shiprocketWebhookController,
   syncTrackingController,
 } from "./shiprocket.controller.js";
 
 const router = express.Router();
 
-router.get("/pickup-locations", getShiprocketPickupLocationsController);
+/* =========================================================
+   PICKUP LOCATIONS
+========================================================= */
 
-// ✅ WEBHOOK (final piece)
-router.post("/webhook", shiprocketWebhookController);
+router.get(
+  "/pickup-locations",
+  getShiprocketPickupLocationsController
+);
 
-router.post("/orders/:orderId/serviceability", checkServiceabilityController);
-router.post("/orders/:orderId/auto-book", autoBookOrderController);
-router.post("/orders/:orderId/manual-book", manualBookOrderController);
-router.post("/orders/:orderId/sync-tracking", syncTrackingController);
+/* =========================================================
+   SHIPROCKET WEBHOOK
+   (hidden route to reduce random hits)
+========================================================= */
 
-router.post("/cancel", cancelShiprocketOrderController);
+router.post(
+  "/srk-foton-track-sync-9x7q2",
+  shiprocketWebhookController
+);
+
+/* =========================================================
+   SERVICEABILITY
+========================================================= */
+
+router.post(
+  "/orders/:orderId/serviceability",
+  checkServiceabilityController
+);
+
+/* =========================================================
+   BOOKING
+========================================================= */
+
+router.post(
+  "/orders/:orderId/auto-book",
+  autoBookOrderController
+);
+
+router.post(
+  "/orders/:orderId/manual-book",
+  manualBookOrderController
+);
+
+/* =========================================================
+   TRACKING
+========================================================= */
+
+router.post(
+  "/orders/:orderId/sync-tracking",
+  syncTrackingController
+);
+
+/* =========================================================
+   CANCELLATION
+========================================================= */
+
+router.post(
+  "/cancel",
+  cancelShiprocketOrderController
+);
 
 export default router;
